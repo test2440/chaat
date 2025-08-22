@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>شات GPT — موقع محادثة</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root{ --bg:#0b1020; --card:#0f1b36; --text:#e5e7eb; --muted:#9aa4b2; --ring:#294266; --brand:#22c55e; }
+    *{box-sizing:border-box}
+    body{margin:0;background:radial-gradient(900px 600px at 80% -20%,#1d2a44 0%,#0b1020 45%),#0b1020;color:var(--text);font-family:"Cairo",system-ui}
+    .wrap{max-width:900px;margin:0 auto;padding:16px}
+    header{position:sticky;top:0;background:linear-gradient(180deg,#0b1020ee,#0b102000);backdrop-filter:blur(6px);z-index:10}
+    .brand{display:flex;align-items:center;gap:10px;padding:10px 0}
+    .logo{width:40px;height:40px;border-radius:12px;background:conic-gradient(from 120deg,#22c55e,#06b6d4);display:grid;place-items:center;font-weight:900;color:#042218}
+    .card{background:linear-gradient(180deg,#0f1b36,#0b1226);border:1px solid #16325f;border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+    .row{display:flex;gap:12px}
+    .chat{height:62vh;overflow:auto;padding:16px}
+    .msg{max-width:80%;padding:10px 12px;border-radius:14px;margin:8px 0;line-height:1.6}
+    .me{background:#123459;margin-left:auto;border-top-left-radius:4px}
+    .bot{background:#0b1226;border:1px solid #16325f;border-top-right-radius:4px}
+    .time{display:block;color:var(--muted);font-size:12px;margin-top:4px}
+    .inputbar{display:flex;gap:8px;padding:12px;border-top:1px solid #16325f}
+    input,textarea,button,select{font-family:inherit}
+    textarea{flex:1;resize:none;height:56px;padding:12px;border-radius:12px;border:1px solid #16325f;background:#0b1226;color:var(--text)}
+    textarea:focus{outline:none;border-color:var(--ring)}
+    button{padding:12px 14px;border-radius:12px;border:1px solid #1c3b66;background:var(--brand);color:#032012;font-weight:900;cursor:pointer}
+    .toolbar{display:flex;gap:8px;flex-wrap:wrap;padding:12px}
+    .pill{padding:6px 10px;border-radius:999px;background:#0b1226;border:1px solid #16325f;color:#cbd5e1}
+    .sys{width:100%;padding:12px;border-top:1px dashed #294266;color:#cbd5e1;font-size:14px}
+    .light body{background:#f8fafc;color:#0f172a}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap brand">
+      <div class="logo">🤖</div>
+      <div>
+        <div style="font-weight:900;font-size:18px">شات GPT</div>
+        <small style="color:#9aa4b2">محادثة مباشرة عبر OpenAI API</small>
+      </div>
+      <div style="margin-inline-start:auto" class="pill">نموذج: <span id="modelName">gpt-4o-mini</span></div>
+    </div>
+  </header>
+
+  <main class="wrap card">
+    <div class="toolbar">
+      <select id="model" class="pill">
+        <option value="gpt-4o-mini" selected>gpt-4o-mini (سريع/اقتصادي)</option>
+        <option value="gpt-4o">gpt-4o (أفضل جودة)</option>
+      </select>
+      <select id="style" class="pill">
+        <option value="helpful" selected>أسلوب: مساعد لطيف</option>
+        <option value="concise">أسلوب: مختصر</option>
+        <option value="creative">أسلوب: مبدع</option>
+      </select>
+      <span class="pill">جلسة: <span id="tokenCount">0</span> رسالة</span>
+    </div>
+
+    <div id="chat" class="chat"></div>
+
+    <div class="sys">
+      <label for="system">تعليمات النظام (اختياري):</label>
+      <textarea id="system" placeholder="مثال: جاوب باللهجة العراقية وباختصار."></textarea>
+    </div>
+
+    <div class="inputbar">
+      <textarea id="input" placeholder="اكتب رسالتك... (Enter للإرسال، Shift+Enter لسطر جديد)"></textarea>
+      <button id="send">إرسال</button>
+    </div>
+  </main>
+
+  <script>
+    const chatEl = document.getElementById('chat');
+    const inputEl = document.getElementById('input');
+    const sendBtn = document.getElementById('send');
+    const sysEl = document.getElementById('system');
+    const modelSel = document.getElementById('model');
+    const modelName = document.getElementById('modelName');
+    const styleSel = document.getElementById('style');
+    const tokenCount = document.getElementById('tokenCount');
+
+    let messages = [];
+
+    function addMsg(role, content){
+      const el = document.createElement('div');
+      el.className = 'msg ' + (role==='user'?'me':'bot');
+      el.innerHTML = content.replace(/\n/g,'<br>');
+      const t = document.createElement('span');
+      t.className='time';
+      t.textContent = new Date().toLocaleTimeString('ar-IQ',{hour:'2-digit',minute:'2-digit'});
+      el.appendChild(t);
+      chatEl.appendChild(el);
+      chatEl.scrollTop = chatEl.scrollHeight;
+    }
+
+    function presetStyle(){
+      const s = styleSel.value;
+      if(s==='concise') return 'جاوب باختصار شديد ونقاط مرتبة.';
+      if(s==='creative') return 'كن مبدعاً وودوداً مع أمثلة.';
+      return 'كن مساعداً ودوداً ومباشراً.';
+    }
+
+    async function send(){
+      const text = inputEl.value.trim(); if(!text) return;
+      messages.push({role:'user', content:text});
+      addMsg('user', text);
+      inputEl.value='';
+
+      const payload = {
+        model: modelSel.value,
+        messages,
+        system: (sysEl.value||presetStyle())
+      };
+
+      modelName.textContent = modelSel.value;
+      try{
+        const res = await fetch('/api/chat',{
+          method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)
+        });
+        if(!res.ok){
+          const err = await res.text();
+          throw new Error(err||res.statusText);
+        }
+        const data = await res.json();
+        const reply = data.text || '(لا يوجد رد)';
+        messages.push({role:'assistant', content: reply});
+        addMsg('assistant', reply);
+        tokenCount.textContent = messages.length;
+      }catch(e){
+        addMsg('assistant', '⚠️ صار خطأ: '+ e.message);
+      }
+    }
+
+    sendBtn.addEventListener('click', send);
+    inputEl.addEventListener('keydown', (e)=>{
+      if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); send(); }
+    });
+
+    // ترحيب أولي
+    addMsg('assistant','هلا بيك! أكتب سؤالك وخلي نجرب الشات 🤖');
+  </script>
+</body>
+</html>
