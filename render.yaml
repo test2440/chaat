@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: chatgpt-site
+    env: node
+    plan: free
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: OPENAI_API_KEY
+        sync: false  # ادخل القيمة من لوحة Render → Environment
